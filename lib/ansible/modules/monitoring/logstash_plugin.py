@@ -38,6 +38,11 @@ options:
         description:
             - Install plugin with that name.
         required: True
+    source:
+        description:
+            - Source of the plugin gem file.
+        required: False
+        default: None
     state:
         description:
             - Apply plugin state.
@@ -79,6 +84,12 @@ EXAMPLES = '''
     name: logstash-input-syslog
     version: '3.2.0'
 
+- name: Install the plugin from a local file
+  logstash_plugin:
+    state: present
+    name: logstash-input-kafka
+    source: /path/to/my/logstash-input-kafka.gem
+
 - name: Uninstall Logstash plugin
   logstash_plugin:
     state: absent
@@ -106,8 +117,11 @@ def parse_error(string):
         return string
 
 
-def install_plugin(module, plugin_bin, plugin_name, version, proxy_host, proxy_port):
-    cmd_args = [plugin_bin, PACKAGE_STATE_MAP["present"], plugin_name]
+def install_plugin(module, plugin_bin, plugin_name, version, proxy_host, proxy_port, source):
+    if not source:
+        source = plugin_name
+
+    cmd_args = [plugin_bin, PACKAGE_STATE_MAP["present"], source]
 
     if version:
         cmd_args.append("--version %s" % version)
@@ -154,7 +168,8 @@ def main():
             plugin_bin=dict(default="/usr/share/logstash/bin/logstash-plugin", type="path"),
             proxy_host=dict(default=None),
             proxy_port=dict(default=None),
-            version=dict(default=None)
+            version=dict(default=None),
+            source=dict(default=None)
         ),
         supports_check_mode=True
     )
@@ -165,6 +180,7 @@ def main():
     proxy_host = module.params["proxy_host"]
     proxy_port = module.params["proxy_port"]
     version = module.params["version"]
+    source = module.params["source"]
 
     present = is_plugin_present(module, plugin_bin, name)
 
@@ -173,7 +189,7 @@ def main():
         module.exit_json(changed=False, name=name, state=state)
 
     if state == "present":
-        changed, cmd, out, err = install_plugin(module, plugin_bin, name, version, proxy_host, proxy_port)
+        changed, cmd, out, err = install_plugin(module, plugin_bin, name, version, proxy_host, proxy_port, source)
     elif state == "absent":
         changed, cmd, out, err = remove_plugin(module, plugin_bin, name)
 
